@@ -123,9 +123,31 @@ export function normalizeSheetForFortune(sheet: any, idx = 0): SheetItem {
   const cleanedSheet = { ...sheet };
   delete cleanedSheet.luckysheet_select_save;
   delete cleanedSheet.luckysheet_selection_range;
+  delete cleanedSheet.image;
+
+  let images: any[] = [];
+  const rawImages = sheet.images || sheet.image;
+  if (Array.isArray(rawImages)) {
+    images = rawImages;
+  } else if (rawImages && typeof rawImages === 'object') {
+    images = Object.entries(rawImages)
+      .map(([key, val]: [string, any]) => {
+        if (!val) return null;
+        return {
+          id: val.id || key,
+          src: val.src || '',
+          left: val.default?.left ?? val.fixedLeft ?? val.left ?? 0,
+          top: val.default?.top ?? val.fixedTop ?? val.top ?? 0,
+          width: val.default?.width ?? val.originWidth ?? val.width ?? 100,
+          height: val.default?.height ?? val.originHeight ?? val.height ?? 100
+        };
+      })
+      .filter(Boolean);
+  }
 
   return {
     ...cleanedSheet,
+    images,
     id,
     order: idx,
     status: idx === 0 ? 1 : 0,

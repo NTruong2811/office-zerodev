@@ -21,6 +21,9 @@ import {
 } from './utils/wordUtils';
 import { compareExcelSheets } from './utils/excelDiffUtils';
 import { compareWordDocs } from './utils/wordDiffUtils';
+import UrlOpenModal from './components/UrlOpenModal';
+import { extractUrlFromLocation, fetchRemoteFile } from './utils/remoteFileUtils';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import './App.css';
 
 export default function App() {
@@ -44,6 +47,11 @@ export default function App() {
   const [selectedSheetFilter, setSelectedSheetFilter] = useState<string>('all');
   const [compareFileA, setCompareFileA] = useState<{ name: string } | null>(null);
   const [compareFileB, setCompareFileB] = useState<{ name: string } | null>(null);
+
+  const [isUrlModalOpen, setIsUrlModalOpen] = useState<boolean>(false);
+  const [isIframeView, setIsIframeView] = useState<boolean>(false);
+  const [remoteUrl, setRemoteUrl] = useState<string>('');
+  const [remoteLoadError, setRemoteLoadError] = useState<string | null>(null);
 
   const excelViewerRef = useRef<ExcelViewerRef>(null);
 
@@ -80,6 +88,47 @@ export default function App() {
       setLoading(false);
     }
   }, []);
+
+  const handleOpenRemoteUrl = useCallback(
+    async (url: string, asIframe = false) => {
+      setLoading(true);
+      setRemoteLoadError(null);
+      setRemoteUrl(url);
+      if (asIframe) {
+        setIsIframeView(true);
+      }
+
+      try {
+        const file = await fetchRemoteFile(url);
+        await handleOpenFile(file);
+      } catch (err: any) {
+        setRemoteLoadError(
+          err?.message || 'Không thể tải tệp tin từ đường dẫn được cung cấp. Vui lòng kiểm tra lại URL.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [handleOpenFile]
+  );
+
+  useEffect(() => {
+    let inIframe = false;
+    try {
+      if (window.self !== window.top) {
+        inIframe = true;
+      }
+    } catch {
+      inIframe = true;
+    }
+
+    const config = extractUrlFromLocation();
+    if (config && config.url) {
+      handleOpenRemoteUrl(config.url, config.isIframe || inIframe);
+    } else if (inIframe) {
+      setIsIframeView(true);
+    }
+  }, [handleOpenRemoteUrl]);
 
   const handleStartCompare = useCallback(
     async (fileA: File, fileB: File, type: FileType) => {
@@ -306,6 +355,51 @@ export default function App() {
     };
   }, [wordHtml]);
 
+  if (remoteLoadError && !isFileOpened) {
+    return (
+      <div className="app-container">
+        <div className="remote-error-screen">
+          <div className="remote-error-card">
+            <div className="remote-error-icon">
+              <AlertTriangle size={36} />
+            </div>
+            <h2 className="remote-error-title">Không Thể Tải Tệp Tin</h2>
+            <p className="remote-error-desc">
+              Không thể tải tệp từ đường dẫn trực tuyến:
+            </p>
+            <div className="remote-error-url-box">
+              <code>{remoteUrl}</code>
+            </div>
+            <p className="remote-error-detail">{remoteLoadError}</p>
+            <div className="remote-error-actions">
+              <button
+                type="button"
+                className="remote-retry-btn"
+                onClick={() => handleOpenRemoteUrl(remoteUrl, isIframeView)}
+              >
+                <RefreshCw size={15} />
+                <span>Thử Lại</span>
+              </button>
+              {!isIframeView && (
+                <button
+                  type="button"
+                  className="remote-home-btn"
+                  onClick={() => {
+                    setRemoteLoadError(null);
+                    setRemoteUrl('');
+                    window.history.replaceState({}, '', '/');
+                  }}
+                >
+                  <span>Về Trang Chủ</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!isFileOpened) {
     return (
       <div className="app-container">
@@ -314,12 +408,18 @@ export default function App() {
           onNewExcel={handleNewExcel}
           onNewWord={handleNewWord}
           onOpenCompare={() => setIsCompareModalOpen(true)}
+          onOpenUrlModal={() => setIsUrlModalOpen(true)}
           onCompareFiles={handleStartCompare}
         />
         <CompareModal
           isOpen={isCompareModalOpen}
           onClose={() => setIsCompareModalOpen(false)}
           onStartCompare={handleStartCompare}
+        />
+        <UrlOpenModal
+          isOpen={isUrlModalOpen}
+          onClose={() => setIsUrlModalOpen(false)}
+          onSubmitUrl={(url) => handleOpenRemoteUrl(url, false)}
         />
         {loading && (
           <div className="loading-spinner-overlay">
@@ -334,31 +434,35 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
-      <Navbar
-        fileName={fileName}
-        fileType={fileType}
-        wordMode={wordMode}
-        isCompareMode={isCompareMode}
-        diffCount={diffList.length}
-        showDiffSidebar={showDiffSidebar}
-        onFileNameChange={setFileName}
-        onWordModeChange={setWordMode}
-        onOpenFile={handleOpenFile}
-        onNewExcel={handleNewExcel}
-        onNewWord={handleNewWord}
-        onCloseFile={handleCloseFile}
-        onOpenCompareModal={() => setIsCompareModalOpen(true)}
-        onExitCompareMode={handleExitCompareMode}
-        onToggleDiffSidebar={() => setShowDiffSidebar((v) => !v)}
-        onExportXlsx={handleExportXlsx}
-        onExportCsv={handleExportCsv}
-        onExportDocx={handleExportDocx}
-        onExportDocHtml={handleExportDocHtml}
-        onPrint={handlePrint}
-      />
+    <div className={`app-container ${isIframeView ? 'is-iframe-view' : ''}`}>
+      {!isIframeView && (
+        <Navbar
+          fileName={fileName}
+          fileType={fileType}
+          wordMode={wordMode}
+          isCompareMode={isCompareMode}
+          diffCount={diffList.length}
+          showDiffSidebar={showDiffSidebar}
+          isIframe={isIframeView}
+          onOpenInNewTab={() => window.open(window.location.href, '_blank')}
+          onFileNameChange={setFileName}
+          onWordModeChange={setWordMode}
+          onOpenFile={handleOpenFile}
+          onNewExcel={handleNewExcel}
+          onNewWord={handleNewWord}
+          onCloseFile={handleCloseFile}
+          onOpenCompareModal={() => setIsCompareModalOpen(true)}
+          onExitCompareMode={handleExitCompareMode}
+          onToggleDiffSidebar={() => setShowDiffSidebar((v) => !v)}
+          onExportXlsx={handleExportXlsx}
+          onExportCsv={handleExportCsv}
+          onExportDocx={handleExportDocx}
+          onExportDocHtml={handleExportDocHtml}
+          onPrint={handlePrint}
+        />
+      )}
 
-      <main className={`app-main-content ${isCompareMode && showDiffSidebar ? 'with-sidebar' : ''}`}>
+      <main className={`app-main-content ${isCompareMode && showDiffSidebar ? 'with-sidebar' : ''} ${isIframeView ? 'iframe-main' : ''}`}>
         <div className="workspace-viewer-area">
           {fileType === 'excel' ? (
             <ExcelViewer
@@ -367,15 +471,17 @@ export default function App() {
               onChange={setSheets}
               fileName={fileName}
               fileVersion={fileVersion}
+              isIframe={isIframeView}
             />
           ) : (
             <WordViewer
               htmlContent={wordHtml}
               docxBuffer={docxBuffer}
-              mode={wordMode}
+              mode={isIframeView ? 'view' : wordMode}
               onContentChange={setWordHtml}
               zoom={zoom}
               onZoomChange={setZoom}
+              isIframe={isIframeView}
             />
           )}
         </div>
@@ -395,14 +501,16 @@ export default function App() {
         )}
       </main>
 
-      <StatusBar
-        fileType={fileType}
-        wordMode={wordMode}
-        sheetCount={sheets.length}
-        wordCount={wordCount}
-        charCount={charCount}
-        zoom={zoom}
-      />
+      {!isIframeView && (
+        <StatusBar
+          fileType={fileType}
+          wordMode={wordMode}
+          sheetCount={sheets.length}
+          wordCount={wordCount}
+          charCount={charCount}
+          zoom={zoom}
+        />
+      )}
 
       <DropOverlay
         isDragging={isDragging}

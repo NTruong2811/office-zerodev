@@ -46,6 +46,7 @@ export interface SheetItem {
   celldata?: LuckyCellData[];
   data?: (SheetCell | null)[][];
   config?: Record<string, any>;
+  images?: any[];
   row?: number;
   column?: number;
 }

@@ -12,7 +12,8 @@ import {
   ChevronDown,
   ArrowLeft,
   GitCompare,
-  List
+  List,
+  ExternalLink
 } from 'lucide-react';
 import type { FileType, WordMode } from '../types/office';
 
@@ -23,6 +24,8 @@ interface NavbarProps {
   isCompareMode?: boolean;
   diffCount?: number;
   showDiffSidebar?: boolean;
+  isIframe?: boolean;
+  onOpenInNewTab?: () => void;
   onFileNameChange: (name: string) => void;
   onWordModeChange: (mode: WordMode) => void;
   onOpenFile: (file: File) => void;
@@ -46,6 +49,8 @@ export default function Navbar({
   isCompareMode = false,
   diffCount = 0,
   showDiffSidebar = true,
+  isIframe = false,
+  onOpenInNewTab,
   onFileNameChange,
   onWordModeChange,
   onOpenFile,
@@ -74,16 +79,18 @@ export default function Navbar({
   };
 
   return (
-    <header className="navbar-root">
+    <header className={`navbar-root ${isIframe ? 'iframe-mode' : ''}`}>
       <div className="navbar-left">
-        <button
-          type="button"
-          className="back-home-btn"
-          onClick={onCloseFile}
-          title="Quay lại màn hình chính"
-        >
-          <ArrowLeft size={16} />
-        </button>
+        {!isIframe && (
+          <button
+            type="button"
+            className="back-home-btn"
+            onClick={onCloseFile}
+            title="Quay lại màn hình chính"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        )}
 
         <div className="app-brand">
           <div className="brand-icon">
@@ -172,6 +179,18 @@ export default function Navbar({
               <span>Thoát So Sánh</span>
             </button>
           </>
+        ) : isIframe ? (
+          onOpenInNewTab && (
+            <button
+              type="button"
+              className="nav-action-btn iframe-tab-btn"
+              onClick={onOpenInNewTab}
+              title="Mở tài liệu trong tab mới"
+            >
+              <ExternalLink size={15} />
+              <span>Mở Tab Mới</span>
+            </button>
+          )
         ) : (
           <>
             <button
@@ -193,49 +212,49 @@ export default function Navbar({
               <Upload size={16} />
               <span>Mở File Khác</span>
             </button>
+
+            <div className="dropdown-wrapper">
+              <button
+                type="button"
+                className="nav-action-btn"
+                onClick={() => {
+                  setShowNewMenu(!showNewMenu);
+                  setShowExportMenu(false);
+                }}
+              >
+                <Plus size={16} />
+                <span>Tạo Mới</span>
+                <ChevronDown size={14} />
+              </button>
+              {showNewMenu && (
+                <div className="dropdown-menu">
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => {
+                      onNewExcel();
+                      setShowNewMenu(false);
+                    }}
+                  >
+                    <FileSpreadsheet size={16} className="text-green" />
+                    <span>Bảng tính Excel (.xlsx)</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => {
+                      onNewWord();
+                      setShowNewMenu(false);
+                    }}
+                  >
+                    <FileText size={16} className="text-blue" />
+                    <span>Tài liệu Word (.docx)</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
-
-        <div className="dropdown-wrapper">
-          <button
-            type="button"
-            className="nav-action-btn"
-            onClick={() => {
-              setShowNewMenu(!showNewMenu);
-              setShowExportMenu(false);
-            }}
-          >
-            <Plus size={16} />
-            <span>Tạo Mới</span>
-            <ChevronDown size={14} />
-          </button>
-          {showNewMenu && (
-            <div className="dropdown-menu">
-              <button
-                type="button"
-                className="dropdown-item"
-                onClick={() => {
-                  onNewExcel();
-                  setShowNewMenu(false);
-                }}
-              >
-                <FileSpreadsheet size={16} className="text-green" />
-                <span>Bảng tính Excel (.xlsx)</span>
-              </button>
-              <button
-                type="button"
-                className="dropdown-item"
-                onClick={() => {
-                  onNewWord();
-                  setShowNewMenu(false);
-                }}
-              >
-                <FileText size={16} className="text-blue" />
-                <span>Tài liệu Word (.docx)</span>
-              </button>
-            </div>
-          )}
-        </div>
 
         <div className="dropdown-wrapper">
           <button

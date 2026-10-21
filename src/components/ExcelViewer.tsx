@@ -1,8 +1,40 @@
-import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef, Component } from 'react';
+import type { ReactNode } from 'react';
 import { Workbook } from '@fortune-sheet/react';
 import type { WorkbookInstance } from '@fortune-sheet/react';
 import '@fortune-sheet/react/dist/index.css';
 import type { SheetItem } from '../types/office';
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class ExcelErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any) {
+    console.error('Workbook render error:', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>
+          <p>Không thể hiển thị bảng tính này bằng bộ vẽ Canvas.</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export interface ExcelViewerRef {
   jumpToCell: (row: number, col: number, sheetIndex?: number, sheetName?: string) => void;
@@ -13,10 +45,11 @@ interface ExcelViewerProps {
   onChange: (sheets: SheetItem[]) => void;
   fileName: string;
   fileVersion?: number;
+  isIframe?: boolean;
 }
 
 const ExcelViewer = forwardRef<ExcelViewerRef, ExcelViewerProps>(
-  ({ sheets, onChange, fileName, fileVersion }, ref) => {
+  ({ sheets, onChange, fileName, fileVersion, isIframe = false }, ref) => {
     const workbookRef = useRef<WorkbookInstance>(null);
 
     useEffect(() => {
@@ -89,16 +122,18 @@ const ExcelViewer = forwardRef<ExcelViewerRef, ExcelViewerProps>(
         className="excel-viewer-container"
         style={{ width: '100%', height: '100%', position: 'relative' }}
       >
-        <Workbook
-          key={fileName + '-' + (fileVersion || 0)}
-          ref={workbookRef}
-          data={sheets as any}
-          onChange={(data) => onChange(data as any)}
-          showToolbar={true}
-          showFormulaBar={true}
-          showSheetTabs={true}
-          allowEdit={true}
-        />
+        <ExcelErrorBoundary key={fileName + '-' + (fileVersion || 0)}>
+          <Workbook
+            key={fileName + '-' + (fileVersion || 0)}
+            ref={workbookRef}
+            data={sheets as any}
+            onChange={(data) => onChange(data as any)}
+            showToolbar={!isIframe}
+            showFormulaBar={!isIframe}
+            showSheetTabs={true}
+            allowEdit={!isIframe}
+          />
+        </ExcelErrorBoundary>
       </div>
     );
   }

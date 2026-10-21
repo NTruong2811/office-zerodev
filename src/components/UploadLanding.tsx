@@ -7,7 +7,8 @@ import {
   FileUp,
   Plus,
   GitCompare,
-  ArrowRight
+  ArrowRight,
+  Globe
 } from 'lucide-react';
 
 import type { FileType } from '../types/office';
@@ -17,6 +18,7 @@ interface UploadLandingProps {
   onNewExcel: () => void;
   onNewWord: () => void;
   onOpenCompare: () => void;
+  onOpenUrlModal: () => void;
   onCompareFiles?: (fileA: File, fileB: File, type: FileType) => void;
 }
 
@@ -25,6 +27,7 @@ export default function UploadLanding({
   onNewExcel,
   onNewWord,
   onOpenCompare,
+  onOpenUrlModal,
   onCompareFiles
 }: UploadLandingProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,14 +97,25 @@ export default function UploadLanding({
           <span className="landing-brand-name">office-zerodev</span>
         </div>
 
-        <button
-          type="button"
-          className="landing-header-compare-btn"
-          onClick={onOpenCompare}
-        >
-          <GitCompare size={15} />
-          <span>So Sánh 2 File</span>
-        </button>
+        <div className="landing-header-actions">
+          <button
+            type="button"
+            className="landing-header-url-btn"
+            onClick={onOpenUrlModal}
+          >
+            <Globe size={15} />
+            <span>Mở Từ URL / Iframe</span>
+          </button>
+
+          <button
+            type="button"
+            className="landing-header-compare-btn"
+            onClick={onOpenCompare}
+          >
+            <GitCompare size={15} />
+            <span>So Sánh 2 File</span>
+          </button>
+        </div>
       </header>
 
       <main className="landing-main">
@@ -199,6 +213,23 @@ export default function UploadLanding({
               <span className="blank-title">So Sánh Sự Khác Biệt Giữa 2 File</span>
               <span className="blank-desc">
                 Tự động highlight các vị trí khác nhau, liệt kê danh sách và click để nhảy đến ô/văn bản thay đổi
+              </span>
+            </div>
+            <ArrowRight size={18} className="blank-plus" />
+          </button>
+
+          <button
+            type="button"
+            className="landing-compare-card url-action-card"
+            onClick={onOpenUrlModal}
+          >
+            <div className="blank-icon-wrap url">
+              <Globe size={22} />
+            </div>
+            <div className="blank-info">
+              <span className="blank-title">Mở Tệp Từ URL Trực Tuyến & Nhúng Iframe</span>
+              <span className="blank-desc">
+                Nhập link file Excel hoặc Word bất kỳ trên internet để xem ngay mà không cần tải về máy
               </span>
             </div>
             <ArrowRight size={18} className="blank-plus" />

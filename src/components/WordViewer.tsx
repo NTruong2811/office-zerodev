@@ -34,6 +34,7 @@ interface WordViewerProps {
   onContentChange: (html: string) => void;
   zoom: number;
   onZoomChange: (zoom: number) => void;
+  isIframe?: boolean;
 }
 
 export default function WordViewer({
@@ -42,7 +43,8 @@ export default function WordViewer({
   mode,
   onContentChange,
   zoom,
-  onZoomChange
+  onZoomChange,
+  isIframe = false
 }: WordViewerProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -62,7 +64,7 @@ export default function WordViewer({
   }, [mode]);
 
   useEffect(() => {
-    if (mode === 'view' && previewRef.current) {
+    if ((mode === 'view' || isIframe) && previewRef.current) {
       previewRef.current.innerHTML = '';
       if (docxBuffer) {
         docxPreview
@@ -80,7 +82,7 @@ export default function WordViewer({
         previewRef.current.innerHTML = `<div class="a4-page">${htmlContent}</div>`;
       }
     }
-  }, [mode, docxBuffer, htmlContent]);
+  }, [mode, docxBuffer, htmlContent, isIframe]);
 
   const exec = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
@@ -139,7 +141,7 @@ export default function WordViewer({
 
   return (
     <div className="word-viewer-layout">
-      {mode === 'edit' && (
+      {!isIframe && mode === 'edit' && (
         <div className="word-ribbon">
           <div className="ribbon-group">
             <button
@@ -432,7 +434,7 @@ export default function WordViewer({
         </div>
       )}
 
-      {mode === 'view' && (
+      {!isIframe && mode === 'view' && (
         <div className="word-view-toolbar">
           <div className="view-mode-badge">
             Chế độ Xem chuẩn bố cục (DOCX High Fidelity)
@@ -467,6 +469,36 @@ export default function WordViewer({
         </div>
       )}
 
+      {isIframe && (
+        <div className="word-floating-zoom-bar">
+          <button
+            type="button"
+            className="floating-zoom-btn"
+            title="Thu nhỏ"
+            onClick={() => onZoomChange(Math.max(50, zoom - 10))}
+          >
+            <ZoomOut size={15} />
+          </button>
+          <span className="floating-zoom-text">{zoom}%</span>
+          <button
+            type="button"
+            className="floating-zoom-btn"
+            title="Phóng to"
+            onClick={() => onZoomChange(Math.min(200, zoom + 10))}
+          >
+            <ZoomIn size={15} />
+          </button>
+          <button
+            type="button"
+            className="floating-zoom-btn"
+            title="Chuẩn 100%"
+            onClick={() => onZoomChange(100)}
+          >
+            <Maximize2 size={15} />
+          </button>
+        </div>
+      )}
+
       <div className="word-paper-viewport">
         <div
           className="word-zoom-container"
@@ -476,7 +508,7 @@ export default function WordViewer({
             transition: 'transform 0.15s ease'
           }}
         >
-          {mode === 'edit' ? (
+          {!isIframe && mode === 'edit' ? (
             <div
               ref={editorRef}
               className="a4-page-editable"
