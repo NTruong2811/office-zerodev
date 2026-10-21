@@ -49,3 +49,26 @@ export interface SheetItem {
   row?: number;
   column?: number;
 }
+
+export type DiffType = 'modified' | 'added' | 'deleted';
+
+export interface DiffItem {
+  id: string;
+  type: DiffType;
+  location: string;
+  sheetIndex?: number;
+  sheetName?: string;
+  row?: number;
+  col?: number;
+  oldContent: string;
+  newContent: string;
+}
+
+export interface CompareResult {
+  fileType: FileType;
+  fileAName: string;
+  fileBName: string;
+  diffList: DiffItem[];
+  diffSheets?: SheetItem[];
+  diffHtml?: string;
+}

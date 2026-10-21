@@ -120,8 +120,12 @@ export function normalizeSheetForFortune(sheet: any, idx = 0): SheetItem {
     customWidth
   };
 
+  const cleanedSheet = { ...sheet };
+  delete cleanedSheet.luckysheet_select_save;
+  delete cleanedSheet.luckysheet_selection_range;
+
   return {
-    ...sheet,
+    ...cleanedSheet,
     id,
     order: idx,
     status: idx === 0 ? 1 : 0,

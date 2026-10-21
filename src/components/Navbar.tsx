@@ -10,7 +10,9 @@ import {
   Edit3,
   Printer,
   ChevronDown,
-  ArrowLeft
+  ArrowLeft,
+  GitCompare,
+  List
 } from 'lucide-react';
 import type { FileType, WordMode } from '../types/office';
 
@@ -18,12 +20,18 @@ interface NavbarProps {
   fileName: string;
   fileType: FileType;
   wordMode: WordMode;
+  isCompareMode?: boolean;
+  diffCount?: number;
+  showDiffSidebar?: boolean;
   onFileNameChange: (name: string) => void;
   onWordModeChange: (mode: WordMode) => void;
   onOpenFile: (file: File) => void;
   onNewExcel: () => void;
   onNewWord: () => void;
   onCloseFile: () => void;
+  onOpenCompareModal: () => void;
+  onExitCompareMode?: () => void;
+  onToggleDiffSidebar?: () => void;
   onExportXlsx: () => void;
   onExportCsv: () => void;
   onExportDocx: () => void;
@@ -35,12 +43,18 @@ export default function Navbar({
   fileName,
   fileType,
   wordMode,
+  isCompareMode = false,
+  diffCount = 0,
+  showDiffSidebar = true,
   onFileNameChange,
   onWordModeChange,
   onOpenFile,
   onNewExcel,
   onNewWord,
   onCloseFile,
+  onOpenCompareModal,
+  onExitCompareMode,
+  onToggleDiffSidebar,
   onExportXlsx,
   onExportCsv,
   onExportDocx,
@@ -66,7 +80,7 @@ export default function Navbar({
           type="button"
           className="back-home-btn"
           onClick={onCloseFile}
-          title="Quay lại màn hình kéo thả file"
+          title="Quay lại màn hình chính"
         >
           <ArrowLeft size={16} />
         </button>
@@ -97,11 +111,17 @@ export default function Navbar({
           <span className={`file-type-badge ${fileType}`}>
             {fileType === 'excel' ? 'EXCEL' : 'WORD'}
           </span>
+          {isCompareMode && (
+            <span className="compare-mode-badge">
+              <GitCompare size={12} />
+              SO SÁNH ({diffCount} khác biệt)
+            </span>
+          )}
         </div>
       </div>
 
       <div className="navbar-center">
-        {fileType === 'word' && (
+        {fileType === 'word' && !isCompareMode && (
           <div className="mode-toggle-pill">
             <button
               type="button"
@@ -132,15 +152,49 @@ export default function Navbar({
           onChange={handleFileChange}
         />
 
-        <button
-          type="button"
-          className="nav-action-btn primary-open"
-          onClick={() => fileInputRef.current?.click()}
-          title="Mở file từ máy tính (.xlsx, .xls, .csv, .docx)"
-        >
-          <Upload size={16} />
-          <span>Mở File Khác</span>
-        </button>
+        {isCompareMode ? (
+          <>
+            <button
+              type="button"
+              className={`nav-action-btn ${showDiffSidebar ? 'active-diff' : ''}`}
+              onClick={onToggleDiffSidebar}
+              title="Ẩn/hiện danh sách khác biệt bên phải"
+            >
+              <List size={16} />
+              <span>Danh Sách Khác Biệt</span>
+            </button>
+            <button
+              type="button"
+              className="nav-action-btn exit-compare-btn"
+              onClick={onExitCompareMode}
+              title="Thoát chế độ so sánh"
+            >
+              <span>Thoát So Sánh</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="nav-action-btn compare-btn"
+              onClick={onOpenCompareModal}
+              title="So sánh sự khác nhau giữa 2 file"
+            >
+              <GitCompare size={16} />
+              <span>So Sánh 2 File</span>
+            </button>
+
+            <button
+              type="button"
+              className="nav-action-btn primary-open"
+              onClick={() => fileInputRef.current?.click()}
+              title="Mở file từ máy tính (.xlsx, .xls, .csv, .docx)"
+            >
+              <Upload size={16} />
+              <span>Mở File Khác</span>
+            </button>
+          </>
+        )}
 
         <div className="dropdown-wrapper">
           <button

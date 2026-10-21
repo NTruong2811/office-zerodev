@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Navbar from './components/Navbar';
 import ExcelViewer from './components/ExcelViewer';
+import type { ExcelViewerRef } from './components/ExcelViewer';
 import WordViewer from './components/WordViewer';
 import StatusBar from './components/StatusBar';
 import DropOverlay from './components/DropOverlay';
 import UploadLanding from './components/UploadLanding';
-import type { FileType, WordMode, SheetItem } from './types/office';
+import DiffSidebar from './components/DiffSidebar';
+import CompareModal from './components/CompareModal';
+import type { FileType, WordMode, SheetItem, DiffItem } from './types/office';
 import {
   parseExcelFile,
   exportToXlsx,
@@ -16,6 +19,8 @@ import {
   exportHtmlToDocx,
   exportHtmlToWordHtml
 } from './utils/wordUtils';
+import { compareExcelSheets } from './utils/excelDiffUtils';
+import { compareWordDocs } from './utils/wordDiffUtils';
 import './App.css';
 
 export default function App() {
@@ -31,8 +36,21 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(false);
   const [fileVersion, setFileVersion] = useState<number>(0);
 
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState<boolean>(false);
+  const [isCompareMode, setIsCompareMode] = useState<boolean>(false);
+  const [diffList, setDiffList] = useState<DiffItem[]>([]);
+  const [activeDiffId, setActiveDiffId] = useState<string | null>(null);
+  const [showDiffSidebar, setShowDiffSidebar] = useState<boolean>(true);
+  const [selectedSheetFilter, setSelectedSheetFilter] = useState<string>('all');
+  const [compareFileA, setCompareFileA] = useState<{ name: string } | null>(null);
+  const [compareFileB, setCompareFileB] = useState<{ name: string } | null>(null);
+
+  const excelViewerRef = useRef<ExcelViewerRef>(null);
+
   const handleOpenFile = useCallback(async (file: File) => {
     setIsDragging(false);
+    setIsCompareMode(false);
+    setDiffList([]);
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     setLoading(true);
 
@@ -63,8 +81,90 @@ export default function App() {
     }
   }, []);
 
+  const handleStartCompare = useCallback(
+    async (fileA: File, fileB: File, type: FileType) => {
+      setLoading(true);
+      setCompareFileA({ name: fileA.name });
+      setCompareFileB({ name: fileB.name });
+      setFileType(type);
+      setFileName(`${fileA.name} ⟷ ${fileB.name}`);
+
+      try {
+        if (type === 'excel') {
+          const parsedA = await parseExcelFile(fileA);
+          const parsedB = await parseExcelFile(fileB);
+          const { diffSheets, diffList: calculatedDiffs } = compareExcelSheets(
+            parsedA,
+            parsedB
+          );
+
+          setSheets(diffSheets);
+          setDiffList(calculatedDiffs);
+          setIsCompareMode(true);
+          setShowDiffSidebar(true);
+          setSelectedSheetFilter('all');
+          setFileVersion((v) => v + 1);
+          setIsFileOpened(true);
+        } else {
+          const htmlA = await parseDocxToHtml(fileA);
+          const htmlB = await parseDocxToHtml(fileB);
+          const { diffHtml, diffList: calculatedDiffs } = compareWordDocs(
+            htmlA,
+            htmlB
+          );
+
+          setWordHtml(diffHtml);
+          setDocxBuffer(null);
+          setDiffList(calculatedDiffs);
+          setWordMode('view');
+          setIsCompareMode(true);
+          setShowDiffSidebar(true);
+          setIsFileOpened(true);
+        }
+      } catch {
+        alert('Có lỗi xảy ra khi so sánh 2 tệp. Vui lòng kiểm tra lại định dạng!');
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const handleJumpToDiff = useCallback(
+    (item: DiffItem) => {
+      setActiveDiffId(item.id);
+
+      if (fileType === 'excel') {
+        excelViewerRef.current?.jumpToCell(
+          item.row !== undefined ? item.row : 0,
+          item.col !== undefined ? item.col : 0,
+          item.sheetIndex,
+          item.sheetName
+        );
+      } else {
+        const el =
+          document.getElementById(item.id) ||
+          document.getElementById(`${item.id}-del`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('diff-pulse-active');
+          setTimeout(() => el.classList.remove('diff-pulse-active'), 2000);
+        }
+      }
+    },
+    [fileType]
+  );
+
+  const handleExitCompareMode = useCallback(() => {
+    setIsCompareMode(false);
+    setDiffList([]);
+    setActiveDiffId(null);
+  }, []);
+
   const handleNewExcel = useCallback(() => {
     setIsDragging(false);
+    setIsCompareMode(false);
+    setDiffList([]);
     setSheets([
       {
         name: 'Sheet1',
@@ -80,11 +180,13 @@ export default function App() {
 
   const handleNewWord = useCallback(() => {
     setIsDragging(false);
+    setIsCompareMode(false);
+    setDiffList([]);
     setWordHtml(`
       <h1 style="text-align: center; color: #1e3a8a;">TIÊU ĐỀ TÀI LIỆU MỚI</h1>
       <p style="text-align: center; color: #64748b; font-style: italic;">Ngày tạo: ${new Date().toLocaleDateString('vi-VN')}</p>
       <hr style="border: none; border-top: 1px solid #cbd5e1; margin: 20px 0;" />
-      <p>Bắt đầu nhập nội dung tài liệu tại đây...</p>
+      <p>Bắt đầu nhập nội dung văn bản của bạn tại đây...</p>
     `);
     setDocxBuffer(null);
     setFileType('word');
@@ -96,6 +198,8 @@ export default function App() {
   const handleCloseFile = useCallback(() => {
     setIsDragging(false);
     setIsFileOpened(false);
+    setIsCompareMode(false);
+    setDiffList([]);
     setSheets([]);
     setWordHtml('');
     setDocxBuffer(null);
@@ -157,6 +261,24 @@ export default function App() {
       setIsDragging(false);
 
       const files = e.dataTransfer?.files;
+      if (files && files.length >= 2) {
+        const ext0 = files[0].name.substring(files[0].name.lastIndexOf('.')).toLowerCase();
+        const ext1 = files[1].name.substring(files[1].name.lastIndexOf('.')).toLowerCase();
+        const isEx0 = ext0 === '.xlsx' || ext0 === '.xls' || ext0 === '.csv';
+        const isEx1 = ext1 === '.xlsx' || ext1 === '.xls' || ext1 === '.csv';
+        const isW0 = ext0 === '.docx' || ext0 === '.doc';
+        const isW1 = ext1 === '.docx' || ext1 === '.doc';
+
+        if (isEx0 && isEx1) {
+          handleStartCompare(files[0], files[1], 'excel');
+          return;
+        }
+        if (isW0 && isW1) {
+          handleStartCompare(files[0], files[1], 'word');
+          return;
+        }
+      }
+
       if (files && files.length > 0) {
         handleOpenFile(files[0]);
       }
@@ -173,7 +295,7 @@ export default function App() {
       window.removeEventListener('dragover', handleDragOver);
       window.removeEventListener('drop', handleDrop);
     };
-  }, [isFileOpened, handleOpenFile]);
+  }, [isFileOpened, handleOpenFile, handleStartCompare]);
 
   const { wordCount, charCount } = useMemo(() => {
     const text = wordHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -191,6 +313,13 @@ export default function App() {
           onFileSelect={handleOpenFile}
           onNewExcel={handleNewExcel}
           onNewWord={handleNewWord}
+          onOpenCompare={() => setIsCompareModalOpen(true)}
+          onCompareFiles={handleStartCompare}
+        />
+        <CompareModal
+          isOpen={isCompareModalOpen}
+          onClose={() => setIsCompareModalOpen(false)}
+          onStartCompare={handleStartCompare}
         />
         {loading && (
           <div className="loading-spinner-overlay">
@@ -210,12 +339,18 @@ export default function App() {
         fileName={fileName}
         fileType={fileType}
         wordMode={wordMode}
+        isCompareMode={isCompareMode}
+        diffCount={diffList.length}
+        showDiffSidebar={showDiffSidebar}
         onFileNameChange={setFileName}
         onWordModeChange={setWordMode}
         onOpenFile={handleOpenFile}
         onNewExcel={handleNewExcel}
         onNewWord={handleNewWord}
         onCloseFile={handleCloseFile}
+        onOpenCompareModal={() => setIsCompareModalOpen(true)}
+        onExitCompareMode={handleExitCompareMode}
+        onToggleDiffSidebar={() => setShowDiffSidebar((v) => !v)}
         onExportXlsx={handleExportXlsx}
         onExportCsv={handleExportCsv}
         onExportDocx={handleExportDocx}
@@ -223,22 +358,39 @@ export default function App() {
         onPrint={handlePrint}
       />
 
-      <main className="app-main-content">
-        {fileType === 'excel' ? (
-          <ExcelViewer
-            sheets={sheets}
-            onChange={setSheets}
-            fileName={fileName}
-            fileVersion={fileVersion}
-          />
-        ) : (
-          <WordViewer
-            htmlContent={wordHtml}
-            docxBuffer={docxBuffer}
-            mode={wordMode}
-            onContentChange={setWordHtml}
-            zoom={zoom}
-            onZoomChange={setZoom}
+      <main className={`app-main-content ${isCompareMode && showDiffSidebar ? 'with-sidebar' : ''}`}>
+        <div className="workspace-viewer-area">
+          {fileType === 'excel' ? (
+            <ExcelViewer
+              ref={excelViewerRef}
+              sheets={sheets}
+              onChange={setSheets}
+              fileName={fileName}
+              fileVersion={fileVersion}
+            />
+          ) : (
+            <WordViewer
+              htmlContent={wordHtml}
+              docxBuffer={docxBuffer}
+              mode={wordMode}
+              onContentChange={setWordHtml}
+              zoom={zoom}
+              onZoomChange={setZoom}
+            />
+          )}
+        </div>
+
+        {isCompareMode && showDiffSidebar && (
+          <DiffSidebar
+            diffList={diffList}
+            activeDiffId={activeDiffId}
+            onJumpToDiff={handleJumpToDiff}
+            onClose={() => setShowDiffSidebar(false)}
+            fileAName={compareFileA?.name || 'File A'}
+            fileBName={compareFileB?.name || 'File B'}
+            sheetNames={fileType === 'excel' ? sheets.map((s) => s.name) : undefined}
+            selectedSheetFilter={selectedSheetFilter}
+            onSelectSheetFilter={setSelectedSheetFilter}
           />
         )}
       </main>
@@ -258,11 +410,17 @@ export default function App() {
         onDismiss={() => setIsDragging(false)}
       />
 
+      <CompareModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        onStartCompare={handleStartCompare}
+      />
+
       {loading && (
         <div className="loading-spinner-overlay">
           <div className="loading-card">
             <div className="spinner" />
-            <p>Đang tải và xử lý tệp tin...</p>
+            <p>Đang tải và so sánh tệp tin...</p>
           </div>
         </div>
       )}

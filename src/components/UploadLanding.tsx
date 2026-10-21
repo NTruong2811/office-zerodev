@@ -6,21 +6,26 @@ import {
   UploadCloud,
   FileUp,
   Plus,
-  Zap,
-  ShieldCheck,
-  Cpu
+  GitCompare,
+  ArrowRight
 } from 'lucide-react';
+
+import type { FileType } from '../types/office';
 
 interface UploadLandingProps {
   onFileSelect: (file: File) => void;
   onNewExcel: () => void;
   onNewWord: () => void;
+  onOpenCompare: () => void;
+  onCompareFiles?: (fileA: File, fileB: File, type: FileType) => void;
 }
 
 export default function UploadLanding({
   onFileSelect,
   onNewExcel,
-  onNewWord
+  onNewWord,
+  onOpenCompare,
+  onCompareFiles
 }: UploadLandingProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isHoveringDrop, setIsHoveringDrop] = useState(false);
@@ -50,6 +55,24 @@ export default function UploadLanding({
     setIsHoveringDrop(false);
 
     const files = e.dataTransfer.files;
+    if (files && files.length >= 2 && onCompareFiles) {
+      const ext0 = files[0].name.substring(files[0].name.lastIndexOf('.')).toLowerCase();
+      const ext1 = files[1].name.substring(files[1].name.lastIndexOf('.')).toLowerCase();
+      const isEx0 = ext0 === '.xlsx' || ext0 === '.xls' || ext0 === '.csv';
+      const isEx1 = ext1 === '.xlsx' || ext1 === '.xls' || ext1 === '.csv';
+      const isW0 = ext0 === '.docx' || ext0 === '.doc';
+      const isW1 = ext1 === '.docx' || ext1 === '.doc';
+
+      if (isEx0 && isEx1) {
+        onCompareFiles(files[0], files[1], 'excel');
+        return;
+      }
+      if (isW0 && isW1) {
+        onCompareFiles(files[0], files[1], 'word');
+        return;
+      }
+    }
+
     if (files && files.length > 0) {
       onFileSelect(files[0]);
     }
@@ -70,20 +93,22 @@ export default function UploadLanding({
           </div>
           <span className="landing-brand-name">office-zerodev</span>
         </div>
+
+        <button
+          type="button"
+          className="landing-header-compare-btn"
+          onClick={onOpenCompare}
+        >
+          <GitCompare size={15} />
+          <span>So Sánh 2 File</span>
+        </button>
       </header>
 
       <main className="landing-main">
         <div className="landing-hero">
-          <div className="landing-badge">
-            <Zap size={14} className="text-amber" />
-            <span>Hiệu năng cao &bull; Phản hồi tức thì</span>
-          </div>
           <h1 className="landing-title">
             Xem và Chỉnh Sửa <span className="highlight-excel">Excel</span> & <span className="highlight-word">Word</span> Trực Tuyến
           </h1>
-          <p className="landing-desc">
-            Kéo thả tệp tin bất kỳ để bắt đầu. Hệ thống tự động phân loại và mở giao diện xử lý tối ưu nhất.
-          </p>
         </div>
 
         <input
@@ -161,21 +186,23 @@ export default function UploadLanding({
               <Plus size={18} className="blank-plus" />
             </button>
           </div>
-        </div>
 
-        <div className="landing-features">
-          <div className="feature-item">
-            <Cpu size={16} className="feature-icon" />
-            <span>Canvas GPU 60 FPS</span>
-          </div>
-          <div className="feature-item">
-            <Zap size={16} className="feature-icon" />
-            <span>Mở tệp &lt; 300ms</span>
-          </div>
-          <div className="feature-item">
-            <ShieldCheck size={16} className="feature-icon" />
-            <span>100% Client-Side Bảo Mật</span>
-          </div>
+          <button
+            type="button"
+            className="landing-compare-card"
+            onClick={onOpenCompare}
+          >
+            <div className="blank-icon-wrap compare">
+              <GitCompare size={22} />
+            </div>
+            <div className="blank-info">
+              <span className="blank-title">So Sánh Sự Khác Biệt Giữa 2 File</span>
+              <span className="blank-desc">
+                Tự động highlight các vị trí khác nhau, liệt kê danh sách và click để nhảy đến ô/văn bản thay đổi
+              </span>
+            </div>
+            <ArrowRight size={18} className="blank-plus" />
+          </button>
         </div>
       </main>
     </div>
